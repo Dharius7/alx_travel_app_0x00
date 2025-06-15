@@ -1,25 +1,32 @@
 from rest_framework import serializers
-from .models import Listing, Booking, Review
+from .models import User, Listing, Booking, Review
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ('id', 'username', 'email', 'first_name', 'last_name')
+        read_only_fields = ('id',)
 
 class ListingSerializer(serializers.ModelSerializer):
-    owner = serializers.ReadOnlyField(source='owner.username')
-
     class Meta:
         model = Listing
-        fields = ['id', 'title', 'description', 'location', 'price_per_night', 'max_guests', 'created_at', 'updated_at', 'owner']
+        fields = '__all__'
+        read_only_fields = ('created_at', 'updated_at')
 
 class BookingSerializer(serializers.ModelSerializer):
-    listing = serializers.PrimaryKeyRelatedField(queryset=Listing.objects.all())
-    user = serializers.ReadOnlyField(source='user.username')
+    user = UserSerializer(read_only=True)
+    listing = ListingSerializer(read_only=True)
 
     class Meta:
         model = Booking
-        fields = ['id', 'listing', 'user', 'start_date', 'end_date', 'total_price', 'status', 'created_at']
+        fields = '__all__'
+        read_only_fields = ('created_at', 'updated_at')
 
 class ReviewSerializer(serializers.ModelSerializer):
-    listing = serializers.PrimaryKeyRelatedField(queryset=Listing.objects.all())
-    user = serializers.ReadOnlyField(source='user.username')
+    user = UserSerializer(read_only=True)
+    listing = ListingSerializer(read_only=True)
 
     class Meta:
         model = Review
-        fields = ['id', 'listing', 'user', 'rating', 'comment', 'created_at']
+        fields = '__all__'
+        read_only_fields = ('created_at', 'updated_at')

@@ -1,91 +1,133 @@
 from django.core.management.base import BaseCommand
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from listings.models import Listing, Booking, Review
 from datetime import date, timedelta
-from decimal import Decimal
 import random
+from decimal import Decimal
+
+User = get_user_model()
 
 class Command(BaseCommand):
-    help = 'Seeds the database with sample data for listings, bookings, and reviews'
+    """Management command to populate the database with sample listings data."""
+    
+    help = 'Populate the database with sample listings data'
 
-    def handle(self, *args, **kwargs):
-        self.stdout.write(self.style.SUCCESS('Starting database seeding...'))
+    def handle(self, *args, **options):
+        """Execute the command to seed the database with sample data."""
+        
+        self.stdout.write("Starting to seed database...")
 
-        # Create users
+        self.stdout.write("Clearing existing data...")
+        Review.objects.all().delete()
+        Booking.objects.all().delete()
+        Listing.objects.all().delete()
+        User.objects.filter(is_superuser=False).delete()
+
+        self.stdout.write("Creating users...")
         users = []
-        for i in range(5):
-            username = f'user{i+1}'
-            if not User.objects.filter(username=username).exists():
-                user = User.objects.create_user(
-                    username=username,
-                    email=f'user{i+1}@example.com',
-                    password='password123'
-                )
-                users.append(user)
-            else:
-                users.append(User.objects.get(username=username))
-
-        # Create listings
-        listings = []
-        sample_listings = [
-            {
-                'title': 'Cozy Beachfront Cottage',
-                'description': 'A charming cottage by the sea.',
-                'location': 'Malibu, CA',
-                'price_per_night': Decimal('150.00'),
-                'max_guests': 4
-            },
-            {
-                'title': 'Urban Loft Downtown',
-                'description': 'Modern loft in the heart of the city.',
-                'location': 'New York, NY',
-                'price_per_night': Decimal('200.00'),
-                'max_guests': 2
-            },
-            {
-                'title': 'Mountain Retreat',
-                'description': 'Secluded cabin with stunning views.',
-                'location': 'Aspen, CO',
-                'price_per_night': Decimal('250.00'),
-                'max_guests': 6
-            }
+        user_data = [
+            ("john_doe", "John", "Doe", "john@example.com"),
+            ("jane_smith", "Jane", "Smith", "jane@example.com"),
+            ("mike_johnson", "Mike", "Johnson", "mike@example.com"),
+            ("sarah_wilson", "Sarah", "Wilson", "sarah@example.com"),
+            ("david_brown", "David", "Brown", "david@example.com"),
+            ("emma_davis", "Emma", "Davis", "emma@example.com"),
+            ("chris_miller", "Chris", "Miller", "chris@example.com"),
+            ("lisa_garcia", "Lisa", "Garcia", "lisa@example.com"),
         ]
 
-        for data in sample_listings:
+        for username, first_name, last_name, email in user_data:
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                password='password123',
+                first_name=first_name,
+                last_name=last_name
+            )
+            users.append(user)
+
+        self.stdout.write(f"Created {len(users)} users")
+
+        self.stdout.write("Creating listings...")
+        listings_data = [
+            ("Cozy Downtown Apartment", "Perfect for couples looking for a romantic getaway with stunning city views.", 120),
+            ("Luxury Beachfront Villa", "Ideal for families, featuring spacious rooms and direct beach access.", 350),
+            ("Mountain Cabin Retreat", "A peaceful retreat surrounded by nature and hiking trails.", 180),
+            ("Modern City Loft", "Contemporary design with high-end furnishings in the heart of downtown.", 200),
+            ("Charming Country House", "Experience rural life in this authentic farmhouse with garden views.", 90),
+            ("Stylish Studio", "Minimalist design perfect for solo travelers or couples.", 75),
+            ("Spacious Family Home", "4-bedroom house ideal for large groups and extended stays.", 250),
+            ("Lakeside Cottage", "Wake up to beautiful lake views in this cozy waterfront property.", 160),
+            ("Historic Brownstone", "Stay in a piece of history with modern amenities and classic charm.", 140),
+            ("Penthouse Suite", "Luxury living with panoramic city views and premium amenities.", 400),
+        ]
+
+        listings = []
+        for title, description, price in listings_data:
+            start_date = date.today() + timedelta(days=random.randint(1, 30))
+            end_date = start_date + timedelta(days=random.randint(60, 300))
+            
             listing = Listing.objects.create(
-                title=data['title'],
-                description=data['description'],
-                location=data['location'],
-                price_per_night=data['price_per_night'],
-                max_guests=data['max_guests'],
-                owner=random.choice(users)
+                title=title,
+                description=description,
+                price_per_night=Decimal(str(price)),
+                available_from=start_date,
+                available_to=end_date
             )
             listings.append(listing)
 
-        # Create bookings
-        for listing in listings:
-            for _ in range(random.randint(1, 3)):
-                start_date = date.today() + timedelta(days=random.randint(1, 30))
-                end_date = start_date + timedelta(days=random.randint(1, 7))
-                days = (end_date - start_date).days
-                total_price = listing.price_per_night * days
+        self.stdout.write(f"Created {len(listings)} listings")
+
+        self.stdout.write("Creating bookings...")
+        booking_count = 0
+        for i in range(6):
+            listing = random.choice(listings)
+            user = random.choice(users)
+            
+            start_date = listing.available_from + timedelta(days=random.randint(0, 30))
+            end_date = start_date + timedelta(days=random.randint(2, 7))
+            
+            if end_date <= listing.available_to:
                 Booking.objects.create(
                     listing=listing,
-                    user=random.choice(users),
+                    user=user,
                     start_date=start_date,
-                    end_date=end_date,
-                    total_price=total_price,
-                    status=random.choice(['pending', 'confirmed', 'cancelled'])
+                    end_date=end_date
                 )
+                booking_count += 1
 
-        # Create reviews
-        for listing in listings:
-            for _ in range(random.randint(1, 2)):
-                Review.objects.create(
-                    listing=listing,
-                    user=random.choice(users),
-                    rating=random.randint(1, 5),
-                    comment=f"This was a {random.choice(['great', 'wonderful', 'decent'])} stay!"
-                )
+        self.stdout.write(f"Created {booking_count} bookings")
 
-        self.stdout.write(self.style.SUCCESS('Database seeded successfully!'))
+        self.stdout.write("Creating reviews...")
+        reviews_data = [
+            (5, "Amazing stay! Everything was perfect."),
+            (4, "Great location and clean apartment. Would stay again."),
+            (5, "Perfect for our weekend getaway. Highly recommended!"),
+            (4, "Good value for money. Minor issues but overall pleasant."),
+            (5, "Absolutely loved this place! Will book again."),
+        ]
+
+        review_count = 0
+        for rating, comment in reviews_data[:3]:
+            listing = random.choice(listings)
+            user = random.choice(users)
+            
+            Review.objects.create(
+                listing=listing,
+                user=user,
+                rating=rating,
+                comment=comment
+            )
+            review_count += 1
+
+        self.stdout.write(f"Created {review_count} reviews")
+
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"\nDatabase seeding completed!\n"
+                f"Total Users: {User.objects.count()}\n"
+                f"Total Listings: {Listing.objects.count()}\n"
+                f"Total Bookings: {Booking.objects.count()}\n"
+                f"Total Reviews: {Review.objects.count()}"
+            )
+        )
